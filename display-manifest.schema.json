@@ -1,0 +1,208 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "",
+    "title": "Manifest Document",
+    "type": "object",
+    "required": [
+        "meta",
+        "slides"
+    ],
+    "properties": {
+        "meta": {
+            "type": "object",
+            "required": [
+                "width",
+                "height"
+            ],
+            "properties": {
+                "width": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Canvas width in pixels. If it differs from the display, drawings are clipped to the display."
+                },
+                "height": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Canvas height in pixels. If it differs from the display, drawings are clipped to the display."
+                },
+                "cacheLifespan": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Manifest cache duration in milliseconds. Optional, defaults to 60000. Values below 5000 are raised to 5000."
+                }
+            },
+            "additionalProperties": false
+        },
+        "slides": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "drawings"
+                ],
+                "properties": {
+                    "duration": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Slide render duration in milliseconds. Optional, defaults to 5000. Values below 250 are raised to 250."
+                    },
+                    "drawings": {
+                        "type": "array",
+                        "description": "Painted in array order; later drawings sit on top of earlier ones. Invalid drawings are skipped by the client.",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/textDrawing"
+                                },
+                                {
+                                    "$ref": "#/$defs/rectDrawing"
+                                },
+                                {
+                                    "$ref": "#/$defs/blockDrawing"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$",
+            "description": "Hex color as #rrggbb. Alpha channel is discarded. Optional, defaults to #ffffff."
+        },
+        "textDrawing": {
+            "type": "object",
+            "required": [
+                "type",
+                "posX",
+                "posY",
+                "prose"
+            ],
+            "properties": {
+                "type": {
+                    "const": "text",
+                    "description": "Drawing type discriminator"
+                },
+                "posX": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "X origin of the text (0 ≤ posX < meta.width). Out-of-range values fall back to 0."
+                },
+                "posY": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Y origin of the text (0 ≤ posY < meta.height). Out-of-range values fall back to 0."
+                },
+                "scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Text scale factor. Optional, defaults to 1. Rounded to the nearest whole number, minimum 1."
+                },
+                "prose": {
+                    "type": "string",
+                    "description": "Text content. Does not word wrap."
+                },
+                "color": {
+                    "$ref": "#/$defs/color"
+                }
+            },
+            "additionalProperties": false
+        },
+        "rectDrawing": {
+            "type": "object",
+            "required": [
+                "type",
+                "posX",
+                "posY",
+                "width",
+                "height"
+            ],
+            "properties": {
+                "type": {
+                    "const": "rect",
+                    "description": "Drawing type discriminator"
+                },
+                "posX": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "X origin of the rectangle (0 ≤ posX < meta.width). Out-of-range values fall back to 0."
+                },
+                "posY": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Y origin of the rectangle (0 ≤ posY < meta.height). Out-of-range values fall back to 0."
+                },
+                "width": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Rectangle width in pixels. Trimmed at the display edge."
+                },
+                "height": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Rectangle height in pixels. Trimmed at the display edge."
+                },
+                "color": {
+                    "$ref": "#/$defs/color"
+                }
+            },
+            "additionalProperties": false
+        },
+        "blockDrawing": {
+            "type": "object",
+            "required": [
+                "type",
+                "posX",
+                "posY",
+                "width",
+                "content"
+            ],
+            "properties": {
+                "type": {
+                    "const": "block",
+                    "description": "Drawing type discriminator"
+                },
+                "posX": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "X origin of the top-left cell (0 ≤ posX < meta.width). Out-of-range values fall back to 0."
+                },
+                "posY": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Y origin of the top-left cell (0 ≤ posY < meta.height). Out-of-range values fall back to 0."
+                },
+                "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Grid width in cells; the wrap point for content. Independent of the display edge: cells past the right edge are clipped, never wrapped."
+                },
+                "scale": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Pixels per cell. Optional, defaults to 1. Rounded to the nearest whole number, minimum 1."
+                },
+                "content": {
+                    "type": "array",
+                    "description": "Flat, row-major list of cells. 1 paints the cell, 0 leaves it unset so whatever is beneath shows through. The final row may be short.",
+                    "items": {
+                        "enum": [
+                            0,
+                            1
+                        ]
+                    }
+                },
+                "color": {
+                    "$ref": "#/$defs/color"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

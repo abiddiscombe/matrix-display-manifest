@@ -1,0 +1,59 @@
+[
+    {
+        "id": "e2e6774192305c6f",
+        "type": "tab",
+        "label": "Matrix Display - Current Time",
+        "disabled": false,
+        "info": "Returns a JSON manifest which shows the current time.\n\n - The digital clock colors adapt to the time of day.\n - Uses the client devices' custom text configuration.\n",
+        "env": []
+    },
+    {
+        "id": "b197bb01a2ab7e0f",
+        "type": "http in",
+        "z": "e2e6774192305c6f",
+        "name": "",
+        "url": "/matrix64",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 170,
+        "y": 180,
+        "wires": [
+            [
+                "17b01949ea2e5177"
+            ]
+        ]
+    },
+    {
+        "id": "10c6a90f2d79fde0",
+        "type": "http response",
+        "z": "e2e6774192305c6f",
+        "name": "Respond",
+        "statusCode": "200",
+        "headers": {},
+        "x": 700,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "17b01949ea2e5177",
+        "type": "function",
+        "z": "e2e6774192305c6f",
+        "name": "Prepare Manifest",
+        "func": "const date = new Date();\nconst hour = date.getHours() + 1;\n\nconst timeCategories = {\n  morning: {\n    start: 6,\n    end: 13,\n    hColor: \"#257cc3\",\n    mColor: \"#1a5e94\",\n    borderColor: \"#000d5fff\"\n  },\n  noon: {\n    start: 13,\n    end: 19,\n    hColor: \"#f0f0f0\",\n    mColor: \"#f0f0f0\",\n    borderColor: \"#2f0000\"\n  },\n  evening: {\n    start: 19,\n    end: 22,\n    hColor: \"#540000\",\n    mColor: \"#440000\",\n    borderColor: \"#2f0000\"\n  },\n  night: {\n    start: 22,\n    end: 6,\n    hColor: \"#100000\",\n    mColor: \"#100000\",\n    borderColor: \"#100000\",\n  }\n};\n\nlet theme = timeCategories.morning;\n\nfor (const [_, config] of Object.entries(timeCategories)) {\n  let isInPeriod;\n\n  if (config.start < config.end) {\n    isInPeriod = hour >= config.start && hour < config.end;\n  } else {\n    // Handle overnight period (Night: 22:00 - 06:00)\n    isInPeriod = hour >= config.start || hour < config.end;\n  }\n\n  if (isInPeriod) {\n    theme = config;\n    break;\n  }\n}\n\nconst manifest = {\n  \"meta\": {\n    \"width\": 64,\n    \"height\": 64,\n    \"cacheLifespan\": 5000\n  },\n  \"slides\": [\n    {\n      \"duration\": 3000,\n      \"drawings\": [\n        {\n          \"type\": \"rect\",\n          \"posX\": 0,\n          \"posY\": 0,\n          \"width\": 64,\n          \"height\": 1,\n          \"color\": theme.borderColor\n        },\n        {\n          \"type\": \"rect\",\n          \"posX\": 0,\n          \"posY\": 63,\n          \"width\": 64,\n          \"height\": 1,\n          \"color\": theme.borderColor\n        },\n        {\n          \"type\": \"rect\",\n          \"posX\": 0,\n          \"posY\": 0,\n          \"width\": 1,\n          \"height\": 64,\n          \"color\": theme.borderColor\n        },\n        {\n          \"type\": \"rect\",\n          \"posX\": 63,\n          \"posY\": 0,\n          \"width\": 1,\n          \"height\": 64,\n          \"color\": theme.borderColor\n        },\n        {\n          \"type\": \"text\",\n          \"posX\": 4,\n          \"posY\": 3,\n          \"scale\": 4,\n          \"prose\": String(date.getHours()).padStart(2, \"0\"),\n          \"color\": theme.hColor,\n        },\n        {\n          \"type\": \"text\",\n          \"posX\": 24,\n          \"posY\": 33,\n          \"scale\": 4,\n          \"prose\": String(date.getMinutes()).padStart(2, \"0\"),\n          \"color\": theme.mColor,\n        },\n      ]\n    }\n  ]\n}\n\nmsg.payload = manifest;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 180,
+        "wires": [
+            [
+                "10c6a90f2d79fde0"
+            ]
+        ]
+    }
+]

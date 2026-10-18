@@ -1,0 +1,36 @@
+/*
+ * Renders the text "Hello... ...world!" across two slides. 
+ */
+{
+    "meta": {
+        "width": 64,
+        "height": 64,
+        "cacheLifespan": 60000
+    },
+    "slides": [
+        {
+            "duration": 5000,
+            "drawings": [
+                {
+                    "type": "text",
+                    "posX": 0,
+                    "posY": 0,
+                    "prose": "Hello...",
+                    "color": "#86489b"
+                }
+            ]
+        },
+        {
+            "duration": 5000,
+            "drawings": [
+                {
+                    "type": "text",
+                    "posX": 0,
+                    "posY": 0,
+                    "prose": "...world!",
+                    "color": "#86489b"
+                }
+            ]
+        }
+    ]
+}
