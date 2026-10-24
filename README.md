@@ -28,7 +28,7 @@ The schema supports three drawing types:
   Renders a text string using the client's text-rendering methods. In the case of the Interstate 75 W board that is the [PicoGraphics](https://github.com/pimoroni/pimoroni-pico/tree/main/micropython/modules/picographics) library which is bundled in the default ROM.
 
 - **`block`**\
-  Renders custom binary "buffers" for masking complex shapes. Please note this is _not_ a true binary buffer: it is an array of `1` and `0` numbers, wrapped at a set line length to represent a 2D sprite. I chose `0`/`1` over `false`/`true` because this is a JSON file and every character counts.
+  Renders a flat, row-major array of palette indices wrapped at a set width to represent a 2D sprite. `0` leaves a cell transparent, while positive integers select colors from the optional `palette` object. The optional `color` is used for indices without a palette entry, and keeps simple binary (`0`/`1`) blocks compact.
 
 - **`rect`**\
   Renders a rectangle or a straight horizontal/vertical line. It can also be used to fill or reset the background color. More complex polygons can be constructed with a `block` drawing.

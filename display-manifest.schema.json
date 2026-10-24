@@ -25,6 +25,10 @@
                     "minimum": 1,
                     "description": "Canvas height in pixels. If it differs from the display, drawings are clipped to the display."
                 },
+                "background": {
+                    "$ref": "#/$defs/color",
+                    "description": "Canvas background color. Optional, defaults to black."
+                },
                 "cacheLifespan": {
                     "type": "number",
                     "minimum": 0,
@@ -190,13 +194,21 @@
                 },
                 "content": {
                     "type": "array",
-                    "description": "Flat, row-major list of cells. 1 paints the cell, 0 leaves it unset so whatever is beneath shows through. The final row may be short.",
+                    "description": "Flat, row-major list of palette indices. 0 leaves a cell unset so whatever is beneath shows through. Positive indices select palette colors, falling back to color or white when absent. The final row may be short.",
                     "items": {
-                        "enum": [
-                            0,
-                            1
-                        ]
+                        "type": "integer",
+                        "minimum": 0
                     }
+                },
+                "palette": {
+                    "type": "object",
+                    "description": "Maps positive cell indices to colors.",
+                    "patternProperties": {
+                        "^[1-9][0-9]*$": {
+                            "$ref": "#/$defs/color"
+                        }
+                    },
+                    "additionalProperties": false
                 },
                 "color": {
                     "$ref": "#/$defs/color"

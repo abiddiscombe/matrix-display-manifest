@@ -17,7 +17,8 @@ from secrets import WIFI_SSID, WIFI_PASS, MANIFEST_URL
 # CONFIGURATION
 # ----------------------------------------------------------------
 
-# WIFI_SSID, WIFI_PASS and MANIFEST_URL are required in secrets.py
+# WIFI_SSID, WIFI_PASS and MANIFEST_URL are required in secrets.py (no sensible
+# default exists, so a missing key fails loudly at import).
 # The values below are optional in secrets.py and fall back if absent.
 
 NETWORK_TIMEOUT = getattr(secrets, "NETWORK_TIMEOUT", 15)  # Seconds to wait for Wi-Fi
@@ -35,6 +36,7 @@ MIN_CACHE_MS = 5000
 MAX_CACHE_MS = 24 * 60 * 60 * 1000
 
 DEFAULT_COLOR = (255, 255, 255)
+DEFAULT_BACKGROUND = (0, 0, 0)
 
 wlan = network.WLAN(network.STA_IF)
 
@@ -93,10 +95,11 @@ def parse_scale(value):
         return 1
 
 
-def parse_color(value):
-    # "#rrggbb" or "#rrggbbaa" -> (r, g, b). Alpha channel is discarded. Falls back to white.
+def parse_color(value, default=DEFAULT_COLOR):
+    # "#rrggbb" or "#rrggbbaa" -> (r, g, b). Alpha is discarded.
+    # Missing/null/malformed falls back to the given default (white).
     if value is None:
-        return DEFAULT_COLOR
+        return default
 
     try:
         if not isinstance(value, str) or len(value) not in (7, 9) or value[0] != "#":
@@ -105,7 +108,7 @@ def parse_color(value):
         return (int(value[1:3], 16), int(value[3:5], 16), int(value[5:7], 16))
     except ValueError:
         print(f"[ Manifest ] Invalid color {value}. Using default.")
-        return DEFAULT_COLOR
+        return default
 
 
 def clamp_origin(value, limit):
@@ -119,16 +122,17 @@ def clip_extent(size, origin, limit):
     return max(0, min(int(size), limit - origin))
 
 
-def parse_block(d, x, y, disp_w, disp_h):
-    # Expands a flat [0, 1] array into a list of clipped (x, y, w, h) rectangles.
+def parse_block(d, x, y, disp_w, disp_h, default_rgb):
+    # Expands a flat array of palette indices (0 = empty) into a list of clipped (x, y, w, h, rgb) rectangles.
     #
     # "width" is the wrap point in cells and is independent of the display edge:
     # cells past the right edge are clipped, never wrapped onto the next row.
-    # Consecutive filled cells in a row are merged into one rectangle to keep
+    # Consecutive cells with the same index in a row are merged into one rectangle to keep
     # the number of draw calls (and tuples held in memory) down.
     content = d["content"]
     cols = int(d["width"])
     scale = parse_scale(d.get("scale"))
+    palette = d.get("palette")
 
     if not isinstance(content, list):
         raise ValueError("content must be an array")
@@ -136,10 +140,14 @@ def parse_block(d, x, y, disp_w, disp_h):
     if cols < 1:
         raise ValueError("width must be at least 1")
 
+    if not isinstance(palette, dict):
+        palette = {}
+
+    colors = {key: parse_color(value) for key, value in palette.items()}
     rects = []
 
     for row_i, row_start in enumerate(range(0, len(content), cols)):
-        row = content[row_start:row_start + cols]  # Final row may be short
+        row = [int_or_default(cell, 0) for cell in content[row_start:row_start + cols]]  # Final row may be short
         py = y + row_i * scale
 
         if py >= disp_h:
@@ -149,12 +157,14 @@ def parse_block(d, x, y, disp_w, disp_h):
         col = 0
 
         while col < len(row):
-            if not row[col]:
+            cell = row[col]
+
+            if cell < 1:
                 col += 1
                 continue
 
             run_start = col
-            while col < len(row) and row[col]:
+            while col < len(row) and row[col] == cell:
                 col += 1
 
             px = x + run_start * scale
@@ -163,7 +173,7 @@ def parse_block(d, x, y, disp_w, disp_h):
                 break  # Remaining runs on this row sit further right
 
             w = clip_extent((col - run_start) * scale, px, disp_w)
-            rects.append((px, py, w, h))
+            rects.append((px, py, w, h, colors.get(str(cell), default_rgb)))
 
     return rects
 
@@ -187,8 +197,7 @@ def parse_drawing(d, disp_w, disp_h):
     if kind == "block":
         return {
             "type": "block",
-            "rects": parse_block(d, x, y, disp_w, disp_h),
-            "rgb": rgb,
+            "rects": parse_block(d, x, y, disp_w, disp_h, rgb),
         }
 
     if kind == "text":
@@ -275,8 +284,10 @@ def parse_manifest(raw):
         raise ValueError("no playable slides")
 
     cache_ms = int_or_default(meta.get("cacheLifespan"), DEFAULT_CACHE_MS)
+    background = parse_color(meta.get("background"), DEFAULT_BACKGROUND)
 
     return {
+        "background": background,
         "cache_ms": clamp(cache_ms, MIN_CACHE_MS, MAX_CACHE_MS),
         "slides": slides,
     }
@@ -287,23 +298,24 @@ def parse_manifest(raw):
 # ----------------------------------------------------------------
 
 
-def render_slide(slide):
-    i75_display.set_pen(i75_display.create_pen(0, 0, 0))
+def render_slide(slide, background):
+    i75_display.set_pen(i75_display.create_pen(*background))
     i75_display.clear()
 
     # Array order is paint order: later drawings sit on top of earlier ones.
     for d in slide["drawings"]:
-        i75_display.set_pen(i75_display.create_pen(*d["rgb"]))
-
         kind = d["type"]
 
         if kind == "rect":
+            i75_display.set_pen(i75_display.create_pen(*d["rgb"]))
             i75_display.rectangle(d["x"], d["y"], d["w"], d["h"])
         elif kind == "block":
             # Unset cells ("0") are never drawn, so whatever is beneath shows through.
-            for rx, ry, rw, rh in d["rects"]:
+            for rx, ry, rw, rh, rgb in d["rects"]:
+                i75_display.set_pen(i75_display.create_pen(*rgb))
                 i75_display.rectangle(rx, ry, rw, rh)
         elif kind == "text":
+            i75_display.set_pen(i75_display.create_pen(*d["rgb"]))
             i75_display.text(d["prose"], d["x"], d["y"], -1, d["scale"])  # -1 = no word wrap
 
     i75.update()
@@ -373,7 +385,7 @@ async def main_renderer():
             print(f"[ Display ] Rendering: {slide_i + 1} of {slide_count}")
 
             try:
-                render_slide(slide)
+                render_slide(slide, manifest_snapshot["background"])
             except Exception as e:
                 # Still wait out the duration so a failing slide cannot spin the loop.
                 print(f"[ Display ] Slide {slide_i + 1} failed: {type(e).__name__}: {e}")
