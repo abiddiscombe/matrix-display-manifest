@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Asset Editor</title>
+</head>
+
+<body>
+    <header>
+        <div id="brand">
+            <h1>Asset Editor</h1>
+            <p>A tool for visual editing of binary sprite asset arrays.</p>
+        </div>
+        <div id="controls">
+            <div id="dimension-inputs">
+                <div>
+                    <label for="control-cols">Columns (X)</label>
+                    <input id="control-cols" type="number" min="1" max="10000" value="10" />
+                </div>
+                <div>
+                    <label for="control-rows">Rows (Y)</label>
+                    <input id="control-rows" type="number" min="1" max="10000" value="10" />
+                </div>
+            </div>
+            <button id="update-dimensions" type="button" disabled>Update</button>
+        </div>
+    </header>
+    <main>
+        <noscript>
+            This application requires JavaScript to run.
+        </noscript>
+        <div id="canvas">
+            <h2>Canvas</h2>
+            <div id="pixel-legend" aria-label="Pixel values">
+                <span><span class="swatch off" aria-hidden="true"></span>0</span>
+                <span><span class="swatch on" aria-hidden="true"></span>1</span>
+                <span><span class="swatch alternate" aria-hidden="true"></span>2</span>
+            </div>
+            <div id="canvas-target"></div>
+        </div>
+        <div id="source">
+            <div id="source-heading">
+                <h2>Source</h2>
+                <div id="character-control" hidden>
+                    <label for="character-select">Character</label>
+                    <select id="character-select"></select>
+                </div>
+            </div>
+            <textarea id="source-target" rows="16"></textarea>
+            <p id="source-status" role="status" aria-live="polite"></p>
+        </div>
+    </main>
+    <button id="clear-canvas" type="button">Clear</button>
+</body>
+<style>
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    *:not(dialog) {
+        margin: 0;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        html {
+            interpolate-size: allow-keywords;
+        }
+    }
+
+    body {
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    img,
+    picture,
+    video,
+    canvas,
+    svg {
+        display: block;
+        max-width: 100%;
+    }
+
+    input,
+    button,
+    textarea,
+    select {
+        font: inherit;
+    }
+
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        overflow-wrap: break-word;
+    }
+
+    p {
+        text-wrap: pretty;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        text-wrap: balance;
+    }
+
+    #root,
+    #__next {
+        isolation: isolate;
+    }
+
+    /** --- */
+    body {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 1em;
+
+        &>header {
+            padding: 1em;
+            color: #fff;
+            background: #00988e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5em;
+            flex-wrap: wrap;
+
+            &>#brand {
+                flex: 1 1 16rem;
+            }
+
+            &>#controls {
+                flex: 0 1 22rem;
+                min-width: 0;
+
+                &>#dimension-inputs {
+                    gap: 0.6em;
+                    display: flex;
+                    flex-direction: row;
+
+                    &>div {
+                        flex: 1 1 0;
+                        min-width: 0;
+
+                        &>label {
+                            margin-bottom: 0.4em;
+                            display: block;
+                            font-size: small;
+                        }
+
+                        &>input {
+                            display: block;
+                            width: 100%;
+                        }
+                    }
+                }
+
+                &>button {
+                    width: 100%;
+                    min-height: 2.5rem;
+                    margin-top: 0.6em;
+                    cursor: pointer;
+                }
+            }
+        }
+
+        &>main {
+            padding-top: 1em;
+
+            gap: 1em;
+            display: flex;
+            flex-flow: row wrap;
+            align-items: stretch;
+
+            & h2 {
+                margin-bottom: 0.5rem;
+                font-size: 1rem;
+                font-weight: 600;
+            }
+
+            &>div {
+                padding: 0.6em;
+                border: 1px solid #00988e;
+                min-width: 0;
+                flex: 1 1 24rem;
+            }
+
+            &>div#canvas {
+                &>#pixel-legend {
+                    gap: 0.75em;
+                    display: flex;
+                    margin-bottom: 0.6em;
+                    font-size: small;
+
+                    &>span {
+                        gap: 0.3em;
+                        display: inline-flex;
+                        align-items: center;
+                    }
+
+                    & .swatch {
+                        width: 0.8rem;
+                        height: 0.8rem;
+                        display: inline-block;
+                    }
+
+                    & .swatch.off {
+                        background: #dedddd;
+                    }
+
+                    & .swatch.on {
+                        background: #0e0e0e;
+                    }
+
+                    & .swatch.alternate {
+                        background: #00988e;
+                    }
+                }
+
+                &>div#canvas-target {
+                    gap: 0.2em;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    overflow: auto;
+                    touch-action: none;
+                    user-select: none;
+
+                    &>.pixel-row {
+                        gap: 0.2em;
+                        display: flex;
+
+                        &>button {
+                            width: 1.1rem;
+                            height: 1.1rem;
+                            flex: 0 0 1rem;
+                            padding: 0;
+                            border: none;
+                            cursor: pointer;
+                        }
+                    }
+
+                    &>button {
+                        width: 1.1rem;
+                        height: 1.1rem;
+                        flex: 0 0 1rem;
+                        border: none;
+                        cursor: pointer;
+                    }
+
+                    &>button.on {
+                        background: #0e0e0e;
+                    }
+
+                    &>button.off,
+                    &>.pixel-row>button.off {
+                        background: #dedddd;
+                    }
+
+                    &>.pixel-row>button.on {
+                        background: #0e0e0e;
+                    }
+
+                    &>.pixel-row>button.alternate {
+                        background: #00988e;
+                    }
+                }
+            }
+
+            &>div#source {
+                &>#source-heading {
+                    margin-bottom: 0.5rem;
+                    gap: 0.75em;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+
+                    &>h2 {
+                        margin-bottom: 0;
+                    }
+                }
+
+                &>#character-control {
+                    gap: 0.4em;
+                    display: flex;
+                    align-items: center;
+                    font-size: small;
+
+                    &[hidden] {
+                        display: none;
+                    }
+                }
+
+                &>textarea {
+                    padding: 0.6em;
+                    width: 100%;
+                    font-size: small;
+                    font-family: monospace;
+                    resize: vertical;
+                    background: #e3e3e3;
+                }
+
+                &>#source-status {
+                    min-height: 1.5em;
+                    color: #545454;
+                    font-size: small;
+
+                    &.error {
+                        color: #a12622;
+                    }
+                }
+            }
+        }
+
+        &>#clear-canvas {
+            display: block;
+            min-height: 2.5rem;
+            margin: 0.75em 0 0 auto;
+            cursor: pointer;
+        }
+    }
+</style>
+<script>
+    let rows = 10;
+    let cols = 10;
+    let state = new Array(rows * cols).fill(0);
+    let currentCharacter = null;
+
+    const canvasTarget = document.getElementById("canvas-target");
+    const sourceTarget = document.getElementById("source-target");
+    const sourceStatus = document.getElementById("source-status");
+    const characterControl = document.getElementById("character-control");
+    const characterSelect = document.getElementById("character-select");
+    const rowsInput = document.getElementById("control-rows");
+    const colsInput = document.getElementById("control-cols");
+    const updateButton = document.getElementById("update-dimensions");
+    const maxPixels = 10000;
+    let isPainting = false;
+    let paintValue = 0;
+
+    const isPixelArray = (value) => Array.isArray(value)
+        && value.length === rows * cols
+        && value.every((pixel) => pixel === 0 || pixel === 1 || pixel === 2);
+
+    const isSpriteSet = (value) => value !== null
+        && typeof value === "object"
+        && !Array.isArray(value)
+        && Object.keys(value).length > 0
+        && Object.values(value).every(isPixelArray);
+
+    const getCurrentSprite = () => Array.isArray(state)
+        ? state
+        : state[currentCharacter];
+
+    const syncCharacterControl = () => {
+        if (Array.isArray(state)) {
+            currentCharacter = null;
+            characterControl.hidden = true;
+            characterSelect.replaceChildren();
+            return;
+        }
+
+        const names = Object.keys(state);
+        if (!names.includes(currentCharacter)) {
+            currentCharacter = names[0];
+        }
+
+        characterSelect.replaceChildren(...names.map((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            return option;
+        }));
+        characterSelect.value = currentCharacter;
+        characterControl.hidden = false;
+    };
+
+    const formatPixelArray = (pixels, indent = "") => {
+        const rowLines = Array.from({ length: rows }, (_, row) => {
+            const start = row * cols;
+            return `${indent}  ${pixels.slice(start, start + cols).join(", ")}`;
+        });
+
+        return `[\n${rowLines.join(",\n")}\n${indent}]`;
+    };
+
+    const renderCanvas = () => {
+        const fragment = document.createDocumentFragment();
+        const pixels = getCurrentSprite();
+
+        for (let row = 0; row < rows; row += 1) {
+            const rowElement = document.createElement("div");
+            rowElement.className = "pixel-row";
+
+            for (let col = 0; col < cols; col += 1) {
+                const index = row * cols + col;
+                const value = pixels[index];
+                const pixel = document.createElement("button");
+                pixel.type = "button";
+                pixel.className = value === 0 ? "off" : value === 1 ? "on" : "alternate";
+                pixel.setAttribute("aria-label", `Row ${row + 1}, column ${col + 1}`);
+                pixel.setAttribute("aria-pressed", String(value !== 0));
+                pixel.dataset.index = String(index);
+                rowElement.appendChild(pixel);
+            }
+
+            fragment.appendChild(rowElement);
+        }
+
+        canvasTarget.replaceChildren(fragment);
+    };
+
+    const formatSource = () => {
+        if (Array.isArray(state)) {
+            return formatPixelArray(state);
+        }
+
+        const entries = Object.entries(state).map(([name, pixels], index, allEntries) => {
+            const trailingComma = index < allEntries.length - 1 ? "," : "";
+            return `  ${JSON.stringify(name)}: ${formatPixelArray(pixels, "  ")}${trailingComma}`;
+        });
+
+        return `{\n${entries.join("\n")}\n}`;
+    };
+
+    const setSource = () => {
+        sourceTarget.value = formatSource();
+        sourceTarget.setAttribute("aria-invalid", "false");
+        showStatus("");
+        syncCharacterControl();
+    };
+
+    const showStatus = (message, isError = false) => {
+        sourceStatus.textContent = message;
+        sourceStatus.classList.toggle("error", isError);
+    };
+
+    const syncUpdateButton = () => {
+        updateButton.disabled = Number(rowsInput.value) === rows
+            && Number(colsInput.value) === cols;
+    };
+
+    const paintPixel = (pixel, value) => {
+        if (!pixel) {
+            return;
+        }
+
+        const index = Number(pixel.dataset.index);
+        const pixels = getCurrentSprite();
+        if (pixels[index] === value) {
+            return;
+        }
+
+        pixels[index] = value;
+        pixel.className = value === 0 ? "off" : value === 1 ? "on" : "alternate";
+        pixel.setAttribute("aria-pressed", String(value !== 0));
+        setSource();
+    };
+
+    const getPaintValue = (pixel, alternate) => {
+        const currentValue = getCurrentSprite()[Number(pixel.dataset.index)];
+        if (alternate) {
+            return currentValue === 2 ? 0 : 2;
+        }
+
+        return currentValue === 1 ? 0 : 1;
+    };
+
+    const parseSource = () => {
+        let parsed;
+
+        try {
+            parsed = JSON.parse(sourceTarget.value);
+        } catch {
+            showStatus("Invalid JSON. Enter an array or an object of sprite arrays.", true);
+            sourceTarget.setAttribute("aria-invalid", "true");
+            return;
+        }
+
+        const isValid = isPixelArray(parsed) || isSpriteSet(parsed);
+
+        if (!isValid) {
+            showStatus(`Enter an array of ${rows * cols} values (0, 1, or 2), or an object whose sprite arrays each have that length.`, true);
+            sourceTarget.setAttribute("aria-invalid", "true");
+            return;
+        }
+
+        state = parsed;
+        syncCharacterControl();
+        sourceTarget.setAttribute("aria-invalid", "false");
+        showStatus("");
+        renderCanvas();
+    };
+
+    const updateDimensions = () => {
+        const nextRows = Number(rowsInput.value);
+        const nextCols = Number(colsInput.value);
+        const dimensionsAreValid = Number.isSafeInteger(nextRows)
+            && Number.isSafeInteger(nextCols)
+            && nextRows > 0
+            && nextCols > 0
+            && nextRows * nextCols <= maxPixels;
+
+        if (!dimensionsAreValid) {
+            showStatus(`Rows and columns must be positive integers with no more than ${maxPixels} pixels total.`, true);
+            rowsInput.value = String(rows);
+            colsInput.value = String(cols);
+            syncUpdateButton();
+            return;
+        }
+
+        if (nextRows === rows && nextCols === cols) {
+            syncUpdateButton();
+            return;
+        }
+
+        const sprites = Array.isArray(state) ? [state] : Object.values(state);
+        const hasActivePixels = sprites.some((pixels) => pixels.some((pixel) => pixel !== 0));
+        if (hasActivePixels && !window.confirm("Changing the dimensions will clear all sprite data. Continue?")) {
+            rowsInput.value = String(rows);
+            colsInput.value = String(cols);
+            syncUpdateButton();
+            return;
+        }
+
+        rows = nextRows;
+        cols = nextCols;
+        if (Array.isArray(state)) {
+            state = new Array(rows * cols).fill(0);
+        } else {
+            state = Object.fromEntries(Object.keys(state).map((name) => [name, new Array(rows * cols).fill(0)]));
+        }
+        rowsInput.value = String(rows);
+        colsInput.value = String(cols);
+        syncUpdateButton();
+        setSource();
+        renderCanvas();
+    };
+
+    canvasTarget.addEventListener("pointerdown", (event) => {
+        const pixel = event.target.closest("button[data-index]");
+        if (!pixel || !event.isPrimary || (event.button !== 0 && !event.ctrlKey)) {
+            return;
+        }
+
+        isPainting = true;
+        paintValue = getPaintValue(pixel, event.ctrlKey);
+        event.preventDefault();
+        paintPixel(pixel, paintValue);
+    });
+
+    canvasTarget.addEventListener("pointerover", (event) => {
+        if (isPainting) {
+            paintPixel(event.target.closest("button[data-index]"), paintValue);
+        }
+    });
+
+    canvasTarget.addEventListener("click", (event) => {
+        if (event.detail === 0) {
+            const pixel = event.target.closest("button[data-index]");
+            if (pixel) {
+                paintPixel(pixel, getPaintValue(pixel, event.ctrlKey));
+            }
+        }
+    });
+
+    canvasTarget.addEventListener("contextmenu", (event) => {
+        if (event.ctrlKey) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener("pointerup", () => {
+        isPainting = false;
+    });
+    window.addEventListener("pointercancel", () => {
+        isPainting = false;
+    });
+
+    document.getElementById("clear-canvas").addEventListener("click", () => {
+        getCurrentSprite().fill(0);
+        setSource();
+        renderCanvas();
+        showStatus(Array.isArray(state) ? "Canvas cleared." : `Character ${currentCharacter} cleared.`);
+    });
+
+    characterSelect.addEventListener("change", () => {
+        currentCharacter = characterSelect.value;
+        renderCanvas();
+    });
+
+    sourceTarget.addEventListener("input", parseSource);
+    sourceTarget.addEventListener("blur", () => {
+        if (sourceTarget.getAttribute("aria-invalid") === "false") {
+            sourceTarget.value = formatSource();
+        }
+    });
+    rowsInput.addEventListener("input", syncUpdateButton);
+    colsInput.addEventListener("input", syncUpdateButton);
+    updateButton.addEventListener("click", updateDimensions);
+
+    setSource();
+    syncUpdateButton();
+    renderCanvas();
+</script>
+
+</html>
